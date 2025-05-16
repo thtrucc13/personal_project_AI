@@ -1,2 +1,4 @@
-# personal_project_AI
-Báo cáo cá nhân môn Trí tuệ nhân tạo
+# Báo cáo cá nhân 
+Họ tên: Nguyễn Thanh Trúc
+MSSV: 23133080
+Môn học: Trí tuệ nhân tạo
