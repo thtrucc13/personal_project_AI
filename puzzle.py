@@ -11,13 +11,13 @@ from tkinter import messagebox
 import csv
 import os
 
-def log_to_csv(algorithm_name, map_name, time_taken, steps, status="OK", note=""):
+def log_to_csv(algorithm_name, map_name, time_taken, steps, status="OK"):
     file_exists = os.path.isfile("results.csv")
     with open("results.csv", mode="a", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
         if not file_exists:
-            writer.writerow(["Algorithm", "Map", "Time (s)", "Steps", "Status", "Note"])
-        writer.writerow([algorithm_name, map_name, f"{time_taken:.3f}", steps, status, note])
+            writer.writerow(["Algorithm", "Map", "Time (s)", "Steps", "Status"])
+        writer.writerow([algorithm_name, map_name, f"{time_taken:.3f}", steps, status])
 
 def get_current_map_name():
     if initial_state == [1, 2, 3, 4, 5, 6, 0, 7, 8]:
@@ -566,10 +566,10 @@ def solve_puzzle_belief_state():
         time_taken=execution_time,
         steps=steps_count,
         status="OK" if solution else "Fail",
-        note="Complex Env - không so sánh hiệu suất"
     )
     
     time_label.config(text=f"Thời gian thực thi: {execution_time:.3f} giây")
+    steps_count_label.config(text=f"Số bước đi: {steps_count}")
     
     steps_text.config(state=tk.NORMAL)
     steps_text.delete("1.0", tk.END)
@@ -623,10 +623,11 @@ def solve_puzzle_and_or():
         time_taken=execution_time,
         steps=steps_count,
         status="OK" if solution else "Fail",
-        note="Complex Env - không so sánh hiệu suất"
     )
     
     time_label.config(text=f"Thời gian thực thi: {execution_time:.3f} giây")
+    steps_count_label.config(text=f"Số bước đi: {steps_count}")
+
     
     steps_text.config(state=tk.NORMAL)
     steps_text.delete("1.0", tk.END)
@@ -679,11 +680,11 @@ def solve_puzzle_partially_observable():
         time_taken=execution_time,
         steps=steps_count,
         status="OK" if solution else "Fail",
-        note="Complex Env - không so sánh hiệu suất"
     )
     
     time_label.config(text=f"Thời gian thực thi: {execution_time:.3f} giây")
-    
+    steps_count_label.config(text=f"Số bước đi: {steps_count}")
+
     steps_text.config(state=tk.NORMAL)
     steps_text.delete("1.0", tk.END)
     
@@ -734,7 +735,6 @@ def solve_puzzle_backtracking():
         time_taken=execution_time,
         steps=steps_count,
         status="OK" if solution else "Fail",
-        note="CSPs - không so sánh hiệu suất"
     )
     
     time_label.config(text=f"Thời gian thực thi: {execution_time:.3f} giây")
@@ -904,8 +904,7 @@ def solve_puzzle(algorithm):
     algorithm_name = algorithm.__name__ if hasattr(algorithm, '__name__') else str(algorithm)
     map_name = get_current_map_name()  # bạn sẽ tạo hàm nhỏ này bên dưới
     steps_count = len(solution) if solution else 0
-    note = "Không so sánh hiệu suất" if "backtracking" in algorithm_name.lower() else ""
-    log_to_csv(algorithm_name, map_name, execution_time, steps_count, status="OK" if solution else "Fail", note=note)
+    log_to_csv(algorithm_name, map_name, execution_time, steps_count, status="OK" if solution else "Fail")
 
     
     time_label.config(text=f"Thời gian thực thi: {execution_time:.3f} giây")
@@ -967,7 +966,7 @@ def create_matrix_display(frame, state):
             width=4,
             height=2,
             relief="ridge",
-            bg="#FFCCCC" if state[i] == 0 else "#FF9999",  # Cập nhật màu đồng bộ với update_ui
+            bg="#FFE6E6" if state[i] == 0 else "#FFD6D6",
             fg="black",
             borderwidth=2,
             highlightbackground="#FF9999",
@@ -1059,7 +1058,9 @@ def select_map_easy():
     current_state = initial_state[:]
     for i in range(9):
         text = "" if initial_state[i] == 0 else str(initial_state[i])
-        initial_labels[i].config(text=text)
+        color = "#FFE6E6" if initial_state[i] == 0 else "#FFD6D6"
+        initial_labels[i].config(text=text, bg=color, fg="black")
+
     update_ui(current_state, "Easy map selected")
     steps_text.config(state=tk.NORMAL)
     steps_text.delete("1.0", tk.END)
@@ -1071,7 +1072,8 @@ def select_map_medium():
     current_state = initial_state[:]
     for i in range(9):
         text = "" if initial_state[i] == 0 else str(initial_state[i])
-        initial_labels[i].config(text=text)
+        color = "#FFE6E6" if initial_state[i] == 0 else "#FFD6D6"
+        initial_labels[i].config(text=text, bg=color, fg="black")
     update_ui(current_state, "Medium map selected")
     steps_text.config(state=tk.NORMAL)
     steps_text.delete("1.0", tk.END)
@@ -1083,7 +1085,8 @@ def select_map_hard():
     current_state = initial_state[:]
     for i in range(9):
         text = "" if initial_state[i] == 0 else str(initial_state[i])
-        initial_labels[i].config(text=text)
+        color = "#FFE6E6" if initial_state[i] == 0 else "#FFD6D6"
+        initial_labels[i].config(text=text, bg=color, fg="black")
     update_ui(current_state, "Hard map selected")
     steps_text.config(state=tk.NORMAL)
     steps_text.delete("1.0", tk.END)
