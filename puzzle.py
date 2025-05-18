@@ -8,6 +8,27 @@ from random import choice
 import math
 import logging
 from tkinter import messagebox
+import csv
+import os
+
+def log_to_csv(algorithm_name, map_name, time_taken, steps, status="OK", note=""):
+    file_exists = os.path.isfile("results.csv")
+    with open("results.csv", mode="a", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        if not file_exists:
+            writer.writerow(["Algorithm", "Map", "Time (s)", "Steps", "Status", "Note"])
+        writer.writerow([algorithm_name, map_name, f"{time_taken:.3f}", steps, status, note])
+
+def get_current_map_name():
+    if initial_state == [1, 2, 3, 4, 5, 6, 0, 7, 8]:
+        return "Easy"
+    elif initial_state == [1, 2, 3, 4, 0, 5, 6, 7, 8]:
+        return "Medium"
+    elif initial_state == [8, 6, 7, 2, 5, 4, 3, 0, 1]:
+        return "Hard"
+    else:
+        return "Custom"
+
 
 # ------------------------------
 # Thiết lập logging
@@ -356,48 +377,6 @@ def belief_state_solver(start_state, goal_state, beam_width=3):
     logger.info("No solution found")
     return None
 
-def solve_puzzle_belief_state():
-    global current_state
-    # Tạo belief state: trạng thái hiện tại + các trạng thái lân cận
-    belief_states = {tuple(current_state)}
-    for _, new_state in get_possible_moves(current_state):
-        if is_solvable(new_state, goal_state):
-            belief_states.add(tuple(new_state))
-    belief_states = [list(state) for state in belief_states]
-    
-    start_time = time.time()
-    
-    solution = belief_state_solver(belief_states, goal_state, beam_width=5)
-    
-    end_time = time.time()
-    execution_time = end_time - start_time
-    
-    time_label.config(text=f"Thời gian thực thi: {execution_time:.3f} giây")
-    
-    steps_text.config(state=tk.NORMAL)
-    steps_text.delete("1.0", tk.END)
-    
-    if solution:
-        def show_step(index):
-            global current_state
-            if index >= len(solution):
-                steps_text.config(state=tk.DISABLED)
-                return
-            move = solution[index]
-            valid_moves = get_possible_moves(current_state)
-            if move not in [desc for desc, _ in valid_moves]:
-                messagebox.showerror("Lỗi", f"Bước đi không hợp lệ: {move}")
-                return
-            current_state = next(new for desc, new in valid_moves if desc == move)
-            update_ui(current_state, move)
-            steps_text.insert(tk.END, move + "\n")
-            steps_text.see(tk.END)
-            root.after(500, show_step, index + 1)
-        
-        show_step(0)
-    else:
-        messagebox.showerror("Lỗi", "Không tìm thấy lời giải!")
-
 
 def backtracking_solver(start_state, goal_state):
     start_time = time.time()
@@ -579,6 +558,16 @@ def solve_puzzle_belief_state():
     end_time = time.time()
     execution_time = end_time - start_time
     logger.info(f"Execution time: {execution_time:.3f} seconds")
+    # --- Ghi log CSV ---
+    steps_count = len(solution) if solution else 0
+    log_to_csv(
+        algorithm_name="Belief State Search",
+        map_name=get_current_map_name(),
+        time_taken=execution_time,
+        steps=steps_count,
+        status="OK" if solution else "Fail",
+        note="Complex Env - không so sánh hiệu suất"
+    )
     
     time_label.config(text=f"Thời gian thực thi: {execution_time:.3f} giây")
     
@@ -625,6 +614,17 @@ def solve_puzzle_and_or():
     end_time = time.time()
     execution_time = end_time - start_time
     logger.info(f"Execution time: {execution_time:.3f} seconds")
+
+        # Ghi log vào CSV
+    steps_count = len(solution) if solution else 0
+    log_to_csv(
+        algorithm_name="AND-OR Search",
+        map_name=get_current_map_name(),
+        time_taken=execution_time,
+        steps=steps_count,
+        status="OK" if solution else "Fail",
+        note="Complex Env - không so sánh hiệu suất"
+    )
     
     time_label.config(text=f"Thời gian thực thi: {execution_time:.3f} giây")
     
@@ -671,6 +671,16 @@ def solve_puzzle_partially_observable():
     end_time = time.time()
     execution_time = end_time - start_time
     logger.info(f"Execution time: {execution_time:.3f} seconds")
+
+    steps_count = len(solution) if solution else 0
+    log_to_csv(
+        algorithm_name="Partially Observable Search",
+        map_name=get_current_map_name(),
+        time_taken=execution_time,
+        steps=steps_count,
+        status="OK" if solution else "Fail",
+        note="Complex Env - không so sánh hiệu suất"
+    )
     
     time_label.config(text=f"Thời gian thực thi: {execution_time:.3f} giây")
     
@@ -717,12 +727,21 @@ def solve_puzzle_backtracking():
     end_time = time.time()
     execution_time = end_time - start_time
     logger.info(f"Execution time: {execution_time:.3f} seconds")
+    steps_count = len(solution) if solution else 0
+    log_to_csv(
+        algorithm_name="Backtracking",
+        map_name=get_current_map_name(),
+        time_taken=execution_time,
+        steps=steps_count,
+        status="OK" if solution else "Fail",
+        note="CSPs - không so sánh hiệu suất"
+    )
     
     time_label.config(text=f"Thời gian thực thi: {execution_time:.3f} giây")
     
     steps_text.config(state=tk.NORMAL)
     steps_text.delete("1.0", tk.END)
-    
+  
     if solution:
         def show_step(index):
             global current_state
@@ -880,6 +899,14 @@ def solve_puzzle(algorithm):
     end_time = time.time()
     execution_time = end_time - start_time
     logger.info(f"Execution time: {execution_time:.3f} seconds")
+
+    # Ghi log vào CSV
+    algorithm_name = algorithm.__name__ if hasattr(algorithm, '__name__') else str(algorithm)
+    map_name = get_current_map_name()  # bạn sẽ tạo hàm nhỏ này bên dưới
+    steps_count = len(solution) if solution else 0
+    note = "Không so sánh hiệu suất" if "backtracking" in algorithm_name.lower() else ""
+    log_to_csv(algorithm_name, map_name, execution_time, steps_count, status="OK" if solution else "Fail", note=note)
+
     
     time_label.config(text=f"Thời gian thực thi: {execution_time:.3f} giây")
     steps_count_label.config(text="Số bước đi: 0")  # Reset số bước
