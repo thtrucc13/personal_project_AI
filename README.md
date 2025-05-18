@@ -11,7 +11,7 @@ Môn học: Trí tuệ nhân tạo
     - So sánh hiệu suất trên Medium Map, đồng thời kiểm tra khả năng xử lý Easy Map và Hard Map.
 
 ## 2. Nội dung
-### 2.1. Uninformed Search
+## 2.1. Uninformed Search
     Thành phần chính:
     Các thuật toán tìm kiếm không có thông tin (uninformed search) là những phương pháp tìm kiếm không sử dụng thông tin heuristic, chỉ dựa trên cấu trúc không gian trạng thái và các quy tắc di chuyển hợp lệ trong bài toán 8-Puzzle. Nhóm này bao gồm:
     - Breadth-First Search (BFS): Khám phá trạng thái theo mức độ sâu.
