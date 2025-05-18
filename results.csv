@@ -1,0 +1,10 @@
+Algorithm,Map,Time (s),Steps,Status
+Backtracking,Easy,0.005,2,OK
+Backtracking for Checking,Easy,0,2,OK
+Belief State Search,Medium,0.023,30,OK
+Belief State Search,Medium,0.05,30,OK
+AND-OR Search,Medium,3.9,30,OK
+Partially Observable Search,Medium,0.013,30,OK
+Q-learning,Medium,28.71,14,OK
+Q-learning,Easy,0.076,2,OK
+Q-learning,Medium,29.365,14,OK
