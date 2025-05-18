@@ -50,19 +50,27 @@ def bfs_solver(start_state, goal_state):
                 visited.add(tuple(new_state))
     return None
 
-def dfs_solver(start_state, goal_state):
-    stack = [(start_state, [])]
+def dfs_solver(start_state, goal_state, max_depth=30):
+    stack = [(start_state, [], 0)]  # Thêm biến độ sâu
     visited = set()
     visited.add(tuple(start_state))
-    
+
     while stack:
-        state, path = stack.pop()
+        state, path, depth = stack.pop()
         if state == goal_state:
             return path
-        for move, new_state in get_possible_moves(state):
+        if depth >= max_depth:
+            continue
+
+        # Sắp xếp các bước theo heuristic tăng dần để ưu tiên nước đi tốt
+        moves = get_possible_moves(state)
+        moves.sort(key=lambda x: heuristic(x[1], goal_state))
+
+        for move, new_state in reversed(moves):  # reversed vì DFS dùng stack
             if tuple(new_state) not in visited:
-                stack.append((new_state, path + [move]))
                 visited.add(tuple(new_state))
+                stack.append((new_state, path + [move], depth + 1))
+
     return None
 
 def ucs_solver(start_state, goal_state):
@@ -265,37 +273,45 @@ def acceptance_probability(old_cost, new_cost, temperature):
 def simulated_annealing_solver(start_state, goal_state):
     current_state = start_state[:]
     path = []
-    T = 20.0  # Tăng nhiệt độ ban đầu lên 20.0
-    T_min = 0.001  # Tăng T_min để kéo dài quá trình
-    alpha = 0.98  # Giảm tốc độ làm nguội thêm
-    max_iterations_per_temp = 300  # Tăng số lần lặp mỗi nhiệt độ
-    
+    T = 20.0
+    T_min = 0.001
+    alpha = 0.95
+    max_iterations_per_temp = 300
+    max_total_steps = 3000
+
+    visited = set()
     current_heuristic = heuristic(current_state, goal_state)
-    
+    total_steps = 0
+
     while T > T_min:
         i = 1
         while i <= max_iterations_per_temp:
+            if total_steps >= max_total_steps:
+                print("SA dừng vì vượt quá tổng số bước cho phép.")
+                return None
+
             possible_moves = get_possible_moves(current_state)
             if not possible_moves:
                 return None
-            
+
             move_text, next_state = random.choice(possible_moves)
             next_heuristic = heuristic(next_state, goal_state)
             ap = acceptance_probability(current_heuristic, next_heuristic, T)
-            
+
             if ap > random.random():
                 current_state = next_state
                 current_heuristic = next_heuristic
                 path.append(move_text)
-                
-                if current_state == goal_state:  # Kiểm tra ngay sau khi chấp nhận
+
+                if current_state == goal_state:
                     return path
-            
+
             i += 1
-        
+            total_steps += 1
         T *= alpha
-    
+
     return path if current_state == goal_state else None
+
 
 # Sau các hàm như bfs_solver, a_star_solver, v.v.
 def beam_search_solver(start_state, goal_state, beam_width=3):
@@ -448,27 +464,36 @@ def and_or_search_solver(start_state, goal_state):
     """
     logger.info(f"Starting AND-OR search with initial state: {start_state}")
     
-    def solve_node(state, visited, path):
+    def solve_node(state, visited, path, depth=0, max_depth=30):
         if state == goal_state:
             return {"state": state, "move": None, "children": []}
         
+        if depth > max_depth:
+            return None
+
         state_tuple = tuple(state)
         if state_tuple in visited:
             return None
-        
+
         visited.add(state_tuple)
-        
+
         for move, new_state in get_possible_moves(state):
-            child_solution = solve_node(new_state, visited.copy(), path + [move])
+            if not is_solvable(new_state, goal_state):
+                continue
+            if tuple(new_state) in visited:
+                continue
+
+            child_solution = solve_node(new_state, visited, path + [move], depth + 1, max_depth)
             if child_solution:
                 return {
                     "state": state,
                     "move": move,
                     "children": [child_solution]
                 }
-        
+
         visited.remove(state_tuple)
         return None
+
 
     def extract_path(solution):
         path = []
@@ -482,7 +507,7 @@ def and_or_search_solver(start_state, goal_state):
         return path
 
     visited = set()
-    solution_tree = solve_node(start_state, visited, [])
+    solution_tree = solve_node(start_state, visited, [], depth=0, max_depth=30)
     if solution_tree:
         logger.info(f"Solution found with path: {extract_path(solution_tree)}")
     else:
@@ -1188,7 +1213,7 @@ def show_backtracking_warning():
     )
 
 uninformed_menu.add_command(label="BFS", command=lambda: solve_puzzle(bfs_solver))
-uninformed_menu.add_command(label="DFS", command=lambda: solve_puzzle(dfs_solver))
+uninformed_menu.add_command(label="DFS", command=lambda: solve_puzzle(lambda s, g: dfs_solver(s, g, max_depth=30)))
 uninformed_menu.add_command(label="UCS", command=lambda: solve_puzzle(ucs_solver))
 uninformed_menu.add_command(label="IDS", command=lambda: solve_puzzle(ids_solver))
 
