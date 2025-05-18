@@ -10,6 +10,7 @@ import logging
 from tkinter import messagebox
 import csv
 import os
+from tkinter import Canvas, Scrollbar
 
 def log_to_csv(algorithm_name, map_name, time_taken, steps, status="OK"):
     file_exists = os.path.isfile("results.csv")
@@ -570,7 +571,33 @@ def partially_observable_search_solver(start_state, goal_state, beam_width=3):
     logger.info("No solution found")
     return None
 
-def solve_puzzle_belief_state():
+def create_matrix_for_step(parent, state, move_text="", step_num=0):
+    step_frame = tk.Frame(parent, bg="#FFE6E6")
+    step_label = tk.Label(step_frame, text=f"Bước {step_num}: {move_text}", font=("Arial", 8, "bold"), bg="#FFE6E6", fg="black", wraplength=100)  # Thêm wraplength để nhãn không quá rộng
+    step_label.pack(anchor="n")
+    
+    grid_frame = tk.Frame(step_frame, bg="#FFE6E6")
+    grid_frame.pack()
+    
+    labels = []
+    for i in range(9):
+        text = "" if state[i] == 0 else str(state[i])
+        label = tk.Label(
+            grid_frame,
+            text=text,
+            font=("Arial", 10, "bold"),
+            width=3,
+            height=1,
+            relief="ridge",
+            bg="#FFCCCC" if state[i] == 0 else "#FF9999",
+            fg="black",
+            borderwidth=2,
+        )
+        label.grid(row=i // 3, column=i % 3, padx=2, pady=2)
+        labels.append(label)
+    return step_frame
+
+def solve_puzzle_generic(algorithm, algorithm_name, warning_func=None):
     global current_state
     logger.info(f"Current state: {current_state}")
     if not is_solvable(current_state, goal_state):
@@ -578,221 +605,64 @@ def solve_puzzle_belief_state():
         logger.error("Initial state is not solvable")
         return
     
+    if warning_func:
+        warning_func()
+    
     start_time = time.time()
-    solution = belief_state_solver(current_state, goal_state, beam_width=3)
+    solution = algorithm(current_state, goal_state)
     end_time = time.time()
     execution_time = end_time - start_time
-    logger.info(f"Execution time: {execution_time:.3f} seconds")
-    # --- Ghi log CSV ---
     steps_count = len(solution) if solution else 0
-    log_to_csv(
-        algorithm_name="Belief State Search",
-        map_name=get_current_map_name(),
-        time_taken=execution_time,
-        steps=steps_count,
-        status="OK" if solution else "Fail",
-    )
+    
+    log_to_csv(algorithm_name, get_current_map_name(), execution_time, steps_count, status="OK" if solution else "Fail")
     
     time_label.config(text=f"Thời gian thực thi: {execution_time:.3f} giây")
     steps_count_label.config(text=f"Số bước đi: {steps_count}")
     
-    steps_text.config(state=tk.NORMAL)
-    steps_text.delete("1.0", tk.END)
+    # Xóa nội dung cũ trong khung bước đi
+    for widget in steps_inner_frame.winfo_children():
+        widget.destroy()
     
     if solution:
-        def show_step(index):
-            global current_state
-            if index >= len(solution):
-                steps_text.config(state=tk.DISABLED)
-                logger.info("Finished displaying solution")
-                return
-            move = solution[index]
-            logger.info(f"Attempting move {index + 1}: {move}")
-            valid_moves = get_possible_moves(current_state)
+        states = [current_state[:]]  # Lưu trạng thái đầu tiên
+        temp_state = current_state[:]
+        for move in solution:
+            valid_moves = get_possible_moves(temp_state)
             valid_move_descs = [desc for desc, _ in valid_moves]
             if move not in valid_move_descs:
                 messagebox.showerror("Lỗi", f"Bước đi không hợp lệ: {move}\nValid moves: {valid_move_descs}")
                 logger.error(f"Invalid move: {move}, valid moves: {valid_move_descs}")
                 return
-            current_state = next(new for desc, new in valid_moves if desc == move)
+            temp_state = next(new for desc, new in valid_moves if desc == move)
+            states.append(temp_state[:])
+        
+        def show_step(index):
+            global current_state
+            if index >= len(solution):
+                logger.info("Finished displaying solution")
+                return
+            move = solution[index]
+            current_state = states[index + 1]
             update_ui(current_state, move)
-            steps_text.insert(tk.END, f"{move}\n")
-            steps_text.see(tk.END)
+            # Thêm ma trận cho bước hiện tại
+            step_frame = create_matrix_for_step(steps_inner_frame, current_state, move, index + 1)
+            step_frame.pack(side=tk.LEFT, padx=5)  # Hiển thị ngang
+            steps_canvas.update_idletasks()
+            steps_canvas.config(scrollregion=steps_canvas.bbox("all"))
+            # Tự động cuộn ngang để hiển thị bước mới nhất
+            steps_canvas.xview_scroll(1, "units")
             root.update()
             root.after(500, show_step, index + 1)
         
+        # Hiển thị trạng thái ban đầu
+        step_frame = create_matrix_for_step(steps_inner_frame, states[0], "Trạng thái ban đầu", 0)
+        step_frame.pack(side=tk.LEFT, padx=5)
+        steps_canvas.update_idletasks()
+        steps_canvas.config(scrollregion=steps_canvas.bbox("all"))
         show_step(0)
     else:
         messagebox.showerror("Lỗi", "Không tìm thấy lời giải!")
         logger.error("No solution found")
-
-def solve_puzzle_and_or():
-    global current_state
-    logger.info(f"Current state: {current_state}")
-    if not is_solvable(current_state, goal_state):
-        messagebox.showerror("Lỗi", "Trạng thái ban đầu không khả giải!")
-        logger.error("Initial state is not solvable")
-        return
-    
-    start_time = time.time()
-    solution = and_or_search_solver(current_state, goal_state)
-    end_time = time.time()
-    execution_time = end_time - start_time
-    logger.info(f"Execution time: {execution_time:.3f} seconds")
-
-        # Ghi log vào CSV
-    steps_count = len(solution) if solution else 0
-    log_to_csv(
-        algorithm_name="AND-OR Search",
-        map_name=get_current_map_name(),
-        time_taken=execution_time,
-        steps=steps_count,
-        status="OK" if solution else "Fail",
-    )
-    
-    time_label.config(text=f"Thời gian thực thi: {execution_time:.3f} giây")
-    steps_count_label.config(text=f"Số bước đi: {steps_count}")
-
-    
-    steps_text.config(state=tk.NORMAL)
-    steps_text.delete("1.0", tk.END)
-    
-    if solution:
-        def show_step(index):
-            global current_state
-            if index >= len(solution):
-                steps_text.config(state=tk.DISABLED)
-                logger.info("Finished displaying solution")
-                return
-            move = solution[index]
-            logger.info(f"Attempting move {index + 1}: {move}")
-            valid_moves = get_possible_moves(current_state)
-            valid_move_descs = [desc for desc, _ in valid_moves]
-            if move not in valid_move_descs:
-                messagebox.showerror("Lỗi", f"Bước đi không hợp lệ: {move}\nValid moves: {valid_move_descs}")
-                logger.error(f"Invalid move: {move}, valid moves: {valid_move_descs}")
-                return
-            current_state = next(new for desc, new in valid_moves if desc == move)
-            update_ui(current_state, move)
-            steps_text.insert(tk.END, f"{move}\n")
-            steps_text.see(tk.END)
-            root.update()
-            root.after(500, show_step, index + 1)
-        
-        show_step(0)
-    else:
-        messagebox.showerror("Lỗi", "Không tìm thấy lời giải!")
-        logger.error("No solution found")
-
-def solve_puzzle_partially_observable():
-    global current_state
-    logger.info(f"Current state: {current_state}")
-    if not is_solvable(current_state, goal_state):
-        messagebox.showerror("Lỗi", "Trạng thái ban đầu không khả giải!")
-        logger.error("Initial state is not solvable")
-        return
-    
-    start_time = time.time()
-    solution = partially_observable_search_solver(current_state, goal_state, beam_width=3)
-    end_time = time.time()
-    execution_time = end_time - start_time
-    logger.info(f"Execution time: {execution_time:.3f} seconds")
-
-    steps_count = len(solution) if solution else 0
-    log_to_csv(
-        algorithm_name="Partially Observable Search",
-        map_name=get_current_map_name(),
-        time_taken=execution_time,
-        steps=steps_count,
-        status="OK" if solution else "Fail",
-    )
-    
-    time_label.config(text=f"Thời gian thực thi: {execution_time:.3f} giây")
-    steps_count_label.config(text=f"Số bước đi: {steps_count}")
-
-    steps_text.config(state=tk.NORMAL)
-    steps_text.delete("1.0", tk.END)
-    
-    if solution:
-        def show_step(index):
-            global current_state
-            if index >= len(solution):
-                steps_text.config(state=tk.DISABLED)
-                logger.info("Finished displaying solution")
-                return
-            move = solution[index]
-            logger.info(f"Attempting move {index + 1}: {move}")
-            valid_moves = get_possible_moves(current_state)
-            valid_move_descs = [desc for desc, _ in valid_moves]
-            if move not in valid_move_descs:
-                messagebox.showerror("Lỗi", f"Bước đi không hợp lệ: {move}\nValid moves: {valid_move_descs}")
-                logger.error(f"Invalid move: {move}, valid moves: {valid_move_descs}")
-                return
-            current_state = next(new for desc, new in valid_moves if desc == move)
-            update_ui(current_state, move)
-            steps_text.insert(tk.END, f"{move}\n")
-            steps_text.see(tk.END)
-            root.update()
-            root.after(500, show_step, index + 1)
-        
-        show_step(0)
-    else:
-        messagebox.showerror("Lỗi", "Không tìm thấy lời giải!")
-        logger.error("No solution found")
-
-def solve_puzzle_backtracking():
-    global current_state
-    logger.info(f"Current state: {current_state}")
-    if not is_solvable(current_state, goal_state):
-        messagebox.showerror("Lỗi", "Trạng thái ban đầu không khả giải!")
-        logger.error("Initial state is not solvable")
-        return
-    
-    start_time = time.time()
-    solution = backtracking_solver(current_state, goal_state)
-    end_time = time.time()
-    execution_time = end_time - start_time
-    logger.info(f"Execution time: {execution_time:.3f} seconds")
-    steps_count = len(solution) if solution else 0
-    log_to_csv(
-        algorithm_name="Backtracking",
-        map_name=get_current_map_name(),
-        time_taken=execution_time,
-        steps=steps_count,
-        status="OK" if solution else "Fail",
-    )
-    
-    time_label.config(text=f"Thời gian thực thi: {execution_time:.3f} giây")
-    
-    steps_text.config(state=tk.NORMAL)
-    steps_text.delete("1.0", tk.END)
-  
-    if solution:
-        def show_step(index):
-            global current_state
-            if index >= len(solution):
-                steps_text.config(state=tk.DISABLED)
-                logger.info("Finished displaying solution")
-                return
-            move = solution[index]
-            logger.info(f"Attempting move {index + 1}: {move}")
-            valid_moves = get_possible_moves(current_state)
-            valid_move_descs = [desc for desc, _ in valid_moves]
-            if move not in valid_move_descs:
-                messagebox.showerror("Lỗi", f"Bước đi không hợp lệ: {move}\nValid moves: {valid_move_descs}")
-                logger.error(f"Invalid move: {move}, valid moves: {valid_move_descs}")
-                return
-            current_state = next(new for desc, new in valid_moves if desc == move)
-            update_ui(current_state, move)
-            steps_text.insert(tk.END, f"{move}\n")
-            steps_text.see(tk.END)
-            root.update()
-            root.after(500, show_step, index + 1)
-        
-        show_step(0)
-    else:
-        messagebox.showerror("Lỗi", "Không tìm thấy lời giải trong giới hạn độ sâu!")
-        logger.error("No solution found within depth limit")
 
 def q_learning_solver(start_state, goal_state, episodes=5000, alpha=0.1, gamma=0.9, epsilon=0.1):
     # Khởi tạo bảng Q
@@ -934,9 +804,7 @@ def solve_puzzle(algorithm):
     
     time_label.config(text=f"Thời gian thực thi: {execution_time:.3f} giây")
     steps_count_label.config(text="Số bước đi: 0")  # Reset số bước
-    
-    steps_text.config(state=tk.NORMAL)
-    steps_text.delete("1.0", tk.END)
+
     
     if solution:
         step_count = 0  # Khởi tạo biến đếm
@@ -944,7 +812,6 @@ def solve_puzzle(algorithm):
             nonlocal step_count  # Sử dụng biến đếm
             global current_state
             if index >= len(solution):
-                steps_text.config(state=tk.DISABLED)
                 logger.info("Finished displaying solution")
                 return
             move = solution[index]
@@ -959,8 +826,6 @@ def solve_puzzle(algorithm):
             update_ui(current_state, move)
             step_count += 1  # Tăng số bước
             steps_count_label.config(text=f"Số bước đi: {step_count}")  # Cập nhật label
-            steps_text.insert(tk.END, f"{move}\n")
-            steps_text.see(tk.END)
             root.update()
             root.after(500, show_step, index + 1)
         
@@ -973,9 +838,6 @@ def reset_puzzle():
     global current_state
     current_state = initial_state[:]
     update_ui(current_state, "Reset về trạng thái ban đầu.")
-    steps_text.config(state=tk.NORMAL)
-    steps_text.delete("1.0", tk.END)
-    steps_text.config(state=tk.DISABLED)
 
 # ------------------------------
 # Hàm tạo ma trận hiển thị
@@ -1046,9 +908,6 @@ def input_initial_state():
                     fg="black"
                 )
             update_ui(current_state, "Đã nhập trạng thái mới")
-            steps_text.config(state=tk.NORMAL)
-            steps_text.delete("1.0", tk.END)
-            steps_text.config(state=tk.DISABLED)
             input_window.destroy()
         except ValueError:
             messagebox.showerror("Lỗi", "Vui lòng nhập các số hợp lệ (0-8)!")
@@ -1087,9 +946,6 @@ def select_map_easy():
         initial_labels[i].config(text=text, bg=color, fg="black")
 
     update_ui(current_state, "Easy map selected")
-    steps_text.config(state=tk.NORMAL)
-    steps_text.delete("1.0", tk.END)
-    steps_text.config(state=tk.DISABLED)
 
 def select_map_medium():
     global initial_state, current_state
@@ -1100,9 +956,6 @@ def select_map_medium():
         color = "#FFE6E6" if initial_state[i] == 0 else "#FFD6D6"
         initial_labels[i].config(text=text, bg=color, fg="black")
     update_ui(current_state, "Medium map selected")
-    steps_text.config(state=tk.NORMAL)
-    steps_text.delete("1.0", tk.END)
-    steps_text.config(state=tk.DISABLED)
 
 def select_map_hard():
     global initial_state, current_state
@@ -1113,9 +966,6 @@ def select_map_hard():
         color = "#FFE6E6" if initial_state[i] == 0 else "#FFD6D6"
         initial_labels[i].config(text=text, bg=color, fg="black")
     update_ui(current_state, "Hard map selected")
-    steps_text.config(state=tk.NORMAL)
-    steps_text.delete("1.0", tk.END)
-    steps_text.config(state=tk.DISABLED)
 
 # ------------------------------
 # Khởi tạo giao diện
@@ -1212,29 +1062,24 @@ def show_backtracking_warning():
         "Thuật toán Backtracking có thể giải 8-Puzzle nhưng không phải là lựa chọn tối ưu do độ phức tạp cao và yêu cầu bộ nhớ lớn."
     )
 
-uninformed_menu.add_command(label="BFS", command=lambda: solve_puzzle(bfs_solver))
-uninformed_menu.add_command(label="DFS", command=lambda: solve_puzzle(lambda s, g: dfs_solver(s, g, max_depth=30)))
-uninformed_menu.add_command(label="UCS", command=lambda: solve_puzzle(ucs_solver))
-uninformed_menu.add_command(label="IDS", command=lambda: solve_puzzle(ids_solver))
-
-informed_menu.add_command(label="Greedy", command=lambda: solve_puzzle(greedy_best_first_search))
-informed_menu.add_command(label="A*", command=lambda: solve_puzzle(a_star_solver))
-informed_menu.add_command(label="IDA*", command=lambda: solve_puzzle(ida_star_solver))
-
-local_menu.add_command(label="Simple Hill Climbing", command=lambda: solve_puzzle(simple_hill_climbing_solver))
-local_menu.add_command(label="Steepest Hill Climbing", command=lambda: solve_puzzle(steepest_ascent_hill_climbing_solver))
-local_menu.add_command(label="Stochastic Hill Climbing", command=lambda: solve_puzzle(stochastic_hill_climbing_solver))
-local_menu.add_command(label="Simulated Annealing", command=lambda: solve_puzzle(simulated_annealing_solver))
-local_menu.add_command(label="Beam Search", command=lambda: solve_puzzle(lambda s, g: beam_search_solver(s, g, beam_width=5)))
-
-csp_menu.add_command(label="Backtracking", command=lambda: (show_backtracking_warning(), solve_puzzle_backtracking()))
-csp_menu.add_command(label="Backtracking for Checking", command=lambda: solve_puzzle(backtracking_for_checking_solver))
-
-complex_env_menu.add_command(label="Belief State Search", command=lambda: (show_complex_env_warning(), solve_puzzle_belief_state()))
-complex_env_menu.add_command(label="AND-OR Search", command=lambda: (show_complex_env_warning(), solve_puzzle_and_or()))
-complex_env_menu.add_command(label="Partially Observable Search", command=lambda: (show_complex_env_warning(),solve_puzzle_partially_observable()))
-
-reinforcement_menu.add_command(label="Q-learning", command=lambda: solve_puzzle(q_learning_solver))  # Thêm Q-learning vào menu
+uninformed_menu.add_command(label="BFS", command=lambda: solve_puzzle_generic(bfs_solver, "BFS"))
+uninformed_menu.add_command(label="DFS", command=lambda: solve_puzzle_generic(lambda s, g: dfs_solver(s, g, max_depth=30), "DFS"))
+uninformed_menu.add_command(label="UCS", command=lambda: solve_puzzle_generic(ucs_solver, "UCS"))
+uninformed_menu.add_command(label="IDS", command=lambda: solve_puzzle_generic(ids_solver, "IDS"))
+informed_menu.add_command(label="Greedy", command=lambda: solve_puzzle_generic(greedy_best_first_search, "Greedy"))
+informed_menu.add_command(label="A*", command=lambda: solve_puzzle_generic(a_star_solver, "A*"))
+informed_menu.add_command(label="IDA*", command=lambda: solve_puzzle_generic(ida_star_solver, "IDA*"))
+local_menu.add_command(label="Simple Hill Climbing", command=lambda: solve_puzzle_generic(simple_hill_climbing_solver, "Simple Hill Climbing"))
+local_menu.add_command(label="Steepest Hill Climbing", command=lambda: solve_puzzle_generic(steepest_ascent_hill_climbing_solver, "Steepest Hill Climbing"))
+local_menu.add_command(label="Stochastic Hill Climbing", command=lambda: solve_puzzle_generic(stochastic_hill_climbing_solver, "Stochastic Hill Climbing"))
+local_menu.add_command(label="Simulated Annealing", command=lambda: solve_puzzle_generic(simulated_annealing_solver, "Simulated Annealing"))
+local_menu.add_command(label="Beam Search", command=lambda: solve_puzzle_generic(lambda s, g: beam_search_solver(s, g, beam_width=5), "Beam Search"))
+csp_menu.add_command(label="Backtracking", command=lambda: (show_backtracking_warning(), solve_puzzle_generic(backtracking_solver, "Backtracking")))
+csp_menu.add_command(label="Backtracking for Checking", command=lambda: solve_puzzle_generic(backtracking_for_checking_solver, "Backtracking for Checking"))
+complex_env_menu.add_command(label="Belief State Search", command=lambda: (show_complex_env_warning(), solve_puzzle_generic(belief_state_solver, "Belief State Search")))
+complex_env_menu.add_command(label="AND-OR Search", command=lambda: (show_complex_env_warning(), solve_puzzle_generic(and_or_search_solver, "AND-OR Search")))
+complex_env_menu.add_command(label="Partially Observable Search", command=lambda: (show_complex_env_warning(), solve_puzzle_generic(partially_observable_search_solver, "Partially Observable Search")))
+reinforcement_menu.add_command(label="Q-learning", command=lambda: solve_puzzle_generic(q_learning_solver, "Q-learning"))
 
 menu_bar.add_cascade(label="Uninformed Search", menu=uninformed_menu)
 menu_bar.add_cascade(label="Informed Search", menu=informed_menu)
@@ -1293,15 +1138,16 @@ steps_count_label.pack(pady=5)
 steps_label = tk.Label(info_frame, text="Chi tiết các bước đi:", font=("Arial", 11, "bold"), bg="#FFE6E6", fg="black")
 steps_label.pack(pady=(5, 2))
 
-steps_frame = tk.Frame(info_frame, bg="#FFE6E6")
-steps_frame.pack(fill="both", expand=True, padx=5, pady=5)
-
-steps_text = tk.Text(steps_frame, height=10, width=40, font=("Arial", 10), bg="#FFF5F5", fg="black", bd=1, relief="sunken")
-steps_text.pack(side=tk.LEFT, fill="both", expand=True)
-
-scrollbar = tk.Scrollbar(steps_frame, orient=tk.VERTICAL, command=steps_text.yview)
-scrollbar.pack(side=tk.RIGHT, fill="y")
-steps_text.config(yscrollcommand=scrollbar.set)
+steps_canvas = Canvas(info_frame, bg="#FFE6E6", height=120)  # Giảm chiều cao vì chỉ cần 1 hàng
+steps_canvas.pack(side=tk.TOP, fill="both", expand=True, padx=5, pady=5)
+scrollbar = Scrollbar(info_frame, orient=tk.HORIZONTAL, command=steps_canvas.xview)
+scrollbar.pack(side=tk.BOTTOM, fill="x")
+steps_canvas.config(xscrollcommand=scrollbar.set)
+steps_inner_frame = tk.Frame(steps_canvas, bg="#FFE6E6")
+steps_canvas.create_window((0, 0), window=steps_inner_frame, anchor="nw")
+def update_scrollregion(event=None):
+    steps_canvas.config(scrollregion=steps_canvas.bbox("all"))
+steps_inner_frame.bind("<Configure>", update_scrollregion)
 
 update_ui(current_state)
 root.mainloop()
